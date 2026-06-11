@@ -361,7 +361,7 @@ async function createEvent(){
     const j = await r.json().catch(()=>({}));
     if (!r.ok || !j.url) throw new Error(j.error || 'HTTP ' + r.status);
     const a = $('resultLink'); a.href = j.url; a.textContent = j.url;
-    $('result').style.display = '';
+    $('result').style.display = 'block';
     $('result').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
     // フォールバック
