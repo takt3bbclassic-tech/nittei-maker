@@ -96,7 +96,7 @@ table.wd input[type=text]{padding:6px 8px;font-size:15px}
 </div>
 
 <div class="card">
-  <button class="btn btn-green" id="createBtn" onclick="createEvent()">イベントページを作成</button>
+  <button class="btn btn-green" id="createBtn" onclick="createEventPage()">イベントページを作成</button>
   <div class="err" id="errBox"></div>
 </div>
 
@@ -344,7 +344,7 @@ $('preview') && ($('preview').oninput = ()=>{
 });
 
 /* ===== 作成 ===== */
-async function createEvent(){
+async function createEventPage(){
   $('errBox').textContent = '';
   $('result').style.display = 'none';
   const name = $('evName').value.trim();
