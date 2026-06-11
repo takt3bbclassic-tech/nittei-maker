@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日程候補メーカー｜調整さん・伝助</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#1f2937;--sub:#6b7280;--accent:#2563eb;--accent2:#16a34a;--border:#e5e7eb;--danger:#dc2626}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",Meiryo,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+.wrap{max-width:560px;margin:0 auto;padding:16px 14px 60px}
+h1{font-size:1.2rem;padding:14px 2px 10px}
+h1 small{display:block;font-size:.72rem;font-weight:normal;color:var(--sub)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{font-size:.9rem;margin-bottom:10px;color:#374151}
+label{font-size:.8rem;color:var(--sub);display:block;margin:8px 0 3px}
+input[type=text],input[type=date],textarea,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:16px;background:#fff}
+textarea{resize:vertical}
+.svc{display:flex;gap:8px}
+.svc button{flex:1;padding:11px;border:2px solid var(--border);border-radius:10px;background:#fff;font-size:.95rem;cursor:pointer}
+.svc button.on{border-color:var(--accent);background:#eff6ff;font-weight:bold;color:var(--accent)}
+.row{display:flex;gap:8px;align-items:center}
+.row input[type=text]{flex:1}
+.row input[type=date]{flex:1;width:auto}
+.btn{display:inline-block;width:100%;padding:13px;border:none;border-radius:10px;font-size:1rem;font-weight:bold;cursor:pointer;text-align:center}
+.btn-blue{background:var(--accent);color:#fff}
+.btn-green{background:var(--accent2);color:#fff}
+.btn-sub{background:#fff;border:1px solid var(--border);color:var(--text);font-weight:normal;padding:9px 14px;width:auto;font-size:.85rem}
+.btn:disabled{opacity:.5}
+table.wd{width:100%;border-collapse:collapse;margin-top:6px}
+table.wd td{padding:4px 4px;font-size:.9rem}
+table.wd td:first-child{width:3.2em;white-space:nowrap}
+table.wd input[type=text]{padding:6px 8px;font-size:15px}
+.hint{font-size:.72rem;color:var(--sub);margin-top:6px}
+#preview{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;min-height:120px}
+#count{font-size:.78rem;color:var(--sub);margin-top:4px}
+#result{display:none}
+#result a{word-break:break-all;color:var(--accent);font-weight:bold}
+.err{color:var(--danger);font-size:.85rem;margin-top:8px;white-space:pre-wrap}
+.ok{color:var(--accent2);font-size:.85rem;margin-top:6px}
+.muted{color:var(--sub);font-size:.78rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>日程候補メーカー<small>調整さん・伝助のイベントを条件指定でサクッと作成</small></h1>
+
+<div class="card">
+  <h2>1. サービスを選ぶ</h2>
+  <div class="svc">
+    <button id="svcC" class="on" onclick="setSvc('chouseisan')">調整さん</button>
+    <button id="svcD" onclick="setSvc('densuke')">伝助</button>
+  </div>
+  <label>イベント名</label>
+  <input type="text" id="evName" placeholder="例：6月定例ミーティング">
+  <label>メモ（任意）</label>
+  <input type="text" id="evMemo" placeholder="例：場所は後日連絡">
+</div>
+
+<div class="card">
+  <h2>2. 条件を入力</h2>
+  <label>自然文で指定（例：6月の平日18時開始 ／ 月水金は19時から、火曜は21時から、木曜はなし、土日は13時から ／ 6月の明日以降の平日18時半から、18日は除く、7月の15日まで）</label>
+  <div class="row">
+    <input type="text" id="nlInput" placeholder="6月の平日18時開始">
+    <button class="btn btn-sub" onclick="applyNL()">反映</button>
+  </div>
+
+  <label style="margin-top:14px">期間</label>
+  <div class="row">
+    <input type="date" id="startDate"><span>〜</span><input type="date" id="endDate">
+  </div>
+  <label>除外日（カンマ区切り 例: 6/18, 6/25）</label>
+  <input type="text" id="exclInput" placeholder="なし">
+
+  <label style="margin-top:10px">曜日ごとの設定（チェック=候補に含める／時刻欄：「19:00」「19:00,21:00」「朝,昼,夜」、空欄=日付のみ）</label>
+  <table class="wd" id="wdTable"></table>
+  <div class="row" style="margin-top:6px">
+    <span class="muted" style="white-space:nowrap">祝日の扱い</span>
+    <select id="holSel">
+      <option value="follow">曜日どおり含める</option>
+      <option value="exclude">除外する</option>
+      <option value="custom">個別設定→</option>
+    </select>
+    <input type="text" id="holTime" placeholder="13:00" style="display:none">
+  </div>
+</div>
+
+<div class="card">
+  <h2>3. 候補日プレビュー（直接編集OK）</h2>
+  <textarea id="preview" rows="8"></textarea>
+  <div id="count"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-sub" onclick="copyPreview()">候補をコピー</button>
+    <span id="copyMsg" class="ok"></span>
+  </div>
+</div>
+
+<div class="card">
+  <button class="btn btn-green" id="createBtn" onclick="createEvent()">イベントページを作成</button>
+  <div class="err" id="errBox"></div>
+</div>
+
+<div class="card" id="result">
+  <h2>✅ 作成できました</h2>
+  <p><a id="resultLink" href="#" target="_blank" rel="noopener"></a></p>
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-sub" onclick="copyLink()">リンクをコピー</button>
+    <span id="linkMsg" class="ok"></span>
+  </div>
+</div>
+
+<p class="hint">※ 非公式の自動作成です。各サービスの仕様変更で動かなくなることがあります。その場合は「候補をコピー」して公式ページに貼り付けてください。</p>
+</div>
+
+<!-- 伝助フォールバック用フォーム（確認画面を開く） -->
+<form id="densukeForm" action="https://www.densuke.biz/confirm" method="post" target="_blank" style="display:none">
+  <input type="hidden" name="postfix" value="">
+  <input type="hidden" name="eventname"><input type="hidden" name="schedule">
+  <input type="hidden" name="explain"><input type="hidden" name="email" value="">
+  <input type="hidden" name="pw" value="0"><input type="hidden" name="password" value="">
+  <input type="hidden" name="eventchoice" value="1">
+</form>
+
+<script>
+/* ===== パーサー ===== */
+const HOLIDAYS = new Set([
+  '2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29',
+  '2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11',
+  '2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23',
+  '2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22',
+  '2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11',
+  '2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23'
+]);
+const WDCHARS = '日月火水木金土';
+
+function normalize(s){
+  return s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+          .replace(/：/g, ':').replace(/[ \t　]/g, '');
+}
+function parseWeekdays(clause){
+  if (/毎日|全日|全部/.test(clause)) return { days: new Set([0,1,2,3,4,5,6]), heijitsu: false };
+  if (/平日/.test(clause)) return { days: new Set([1,2,3,4,5]), heijitsu: true };
+  if (/土日|週末/.test(clause)) return { days: new Set([0,6]), heijitsu: false };
+  if (/祝日/.test(clause) && !/[月火水木金土日]曜/.test(clause)) return { days: new Set(), holiday: true, heijitsu: false };
+  const days = new Set();
+  for (let i = 0; i < clause.length; i++) {
+    const idx = WDCHARS.indexOf(clause[i]);
+    if (idx < 0) continue;
+    if (i > 0 && /[0-9]/.test(clause[i-1])) continue; // 6月 / 20日
+    const nx = clause[i+1];
+    if (nx === '曜' || nx === undefined || /[月火水木金土日はと・0-9な]/.test(nx)) days.add(idx);
+  }
+  return days.size ? { days, heijitsu: false } : null;
+}
+function parseTimes(clause){
+  if (/なし|除外|除く|休み/.test(clause)) return { type: 'off' };
+  if (/朝昼夜/.test(clause)) return { type: 'slots', slots: ['朝','昼','夜'] };
+  if (/午前午後|午前と午後/.test(clause)) return { type: 'slots', slots: ['午前','午後'] };
+  const times = [];
+  const re = /(\d{1,2})(?:時半|時(\d{1,2})分|:(\d{2})|時)/g;
+  let m;
+  while ((m = re.exec(clause)) !== null) {
+    let h = +m[1], min = 0;
+    if (m[0].includes('時半')) min = 30;
+    else if (m[2] !== undefined) min = +m[2];
+    else if (m[3] !== undefined) min = +m[3];
+    if (h >= 0 && h <= 29) times.push(String(h).padStart(2,'0') + ':' + String(min).padStart(2,'0'));
+  }
+  return times.length ? { type: 'times', times } : { type: 'none' };
+}
+function parseNL(input, now){
+  now = now || new Date();
+  const text = normalize(input);
+  // 基準の年月（最初に出てくる「N月」）
+  let baseYear = null, baseMonth = null;
+  const ym = text.match(/(?:(\d{4})年)?(\d{1,2})月(?!曜)/);
+  if (ym) { baseMonth = +ym[2]; if (ym[1]) baseYear = +ym[1]; }
+  if (baseMonth === null) baseMonth = now.getMonth() + 1;
+  if (baseYear === null) { baseYear = now.getFullYear(); if (baseMonth < now.getMonth() + 1) baseYear++; }
+
+  let start = null, end = null;
+  const exclusions = []; // {month|null, day}
+  const clauses = text.split(/[、。,;\n]/).filter(Boolean);
+  const rules = {}; let holidayRule = null; let usedHeijitsu = false;
+  for (let cl of clauses) {
+    let m;
+    // 除外日: 「18日は除く」「6月18日と25日は除外」（「木曜はなし」とは区別）
+    if (/除く|除外|なし|休み/.test(cl) && !/曜/.test(cl) && (m = cl.match(/\d{1,2}日/g))) {
+      const mm = cl.match(/(\d{1,2})月/);
+      for (const t of m) exclusions.push({ month: mm ? +mm[1] : null, day: +t.slice(0, -1) });
+      continue;
+    }
+    // 開始: 明日以降／今日から／N(月N)日以降・から
+    if ((m = cl.match(/明日(?:以降|から)/))) {
+      const d = new Date(now); d.setDate(d.getDate() + 1);
+      start = { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+      cl = cl.replace(m[0], '');
+    } else if ((m = cl.match(/今日(?:以降|から)/))) {
+      start = { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+      cl = cl.replace(m[0], '');
+    }
+    if ((m = cl.match(/(?:(\d{1,2})月の?)?(\d{1,2})日(?:以降|から)/))) {
+      start = { y: baseYear, m: m[1] ? +m[1] : baseMonth, d: +m[2] };
+      cl = cl.replace(m[0], '');
+    }
+    // 終了: N月N日まで／N日まで／N月まで
+    if ((m = cl.match(/(?:(\d{1,2})月の?)?(\d{1,2})日まで/))) {
+      end = { y: baseYear, m: m[1] ? +m[1] : baseMonth, d: +m[2] };
+      cl = cl.replace(m[0], '');
+    } else if ((m = cl.match(/(\d{1,2})月まで/))) {
+      const mo = +m[1];
+      end = { y: baseYear, m: mo, d: new Date(baseYear, mo, 0).getDate() };
+      cl = cl.replace(m[0], '');
+    }
+    // 曜日・時刻ルール
+    const wd = parseWeekdays(cl);
+    const tm = parseTimes(cl);
+    if (!wd && tm.type === 'none') continue;
+    if (wd && wd.holiday) { holidayRule = { ...tm }; continue; }
+    if (wd && wd.heijitsu) usedHeijitsu = true;
+    const targets = wd ? [...wd.days] : [0,1,2,3,4,5,6].filter(d => !(d in rules));
+    for (const d of targets) rules[d] = { ...tm };
+  }
+  if (!start) start = { y: baseYear, m: baseMonth, d: 1 };
+  if (!end) end = { y: start.y, m: start.m, d: new Date(start.y, start.m, 0).getDate() };
+  if (end.m < start.m) end.y = start.y + 1; // 年跨ぎ（12月→1月など）
+  else end.y = start.y;
+  return { start, end, rules, holidayRule, usedHeijitsu, exclusions };
+}
+
+/* ===== UI状態 ===== */
+let service = 'chouseisan';
+const wdOrder = [1,2,3,4,5,6,0]; // 月..日
+const $ = id => document.getElementById(id);
+
+function setSvc(s){
+  service = s;
+  $('svcC').classList.toggle('on', s==='chouseisan');
+  $('svcD').classList.toggle('on', s==='densuke');
+}
+function toISO(y, m, d){ return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+function initRange(){
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + 1, 1); // 翌月をデフォルト
+  $('startDate').value = toISO(d.getFullYear(), d.getMonth()+1, 1);
+  $('endDate').value = toISO(d.getFullYear(), d.getMonth()+1, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate());
+  $('startDate').onchange = regen; $('endDate').onchange = regen; $('exclInput').oninput = regen;
+}
+function initWdTable(){
+  const t = $('wdTable');
+  for (const wd of wdOrder){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><label style="margin:0;color:var(--text)"><input type="checkbox" id="wdC'+wd+'"> '+WDCHARS[wd]+'</label></td>'+
+                   '<td><input type="text" id="wdT'+wd+'" placeholder="19:00 ／ 朝,昼,夜 ／ 空欄=日付のみ"></td>';
+    t.appendChild(tr);
+  }
+  for (const wd of wdOrder){
+    $('wdC'+wd).onchange = regen;
+    $('wdT'+wd).oninput = regen;
+  }
+  $('holSel').onchange = ()=>{ $('holTime').style.display = $('holSel').value==='custom'?'':'none'; regen(); };
+  $('holTime').oninput = regen;
+}
+function applyNL(){
+  const txt = $('nlInput').value.trim();
+  if (!txt) return;
+  const p = parseNL(txt);
+  $('startDate').value = toISO(p.start.y, p.start.m, p.start.d);
+  $('endDate').value = toISO(p.end.y, p.end.m, p.end.d);
+  // 除外日を期間内の具体日に解決（月指定なしは期間内の全該当月）
+  const sd = new Date(p.start.y, p.start.m - 1, p.start.d);
+  const ed = new Date(p.end.y, p.end.m - 1, p.end.d);
+  const exclStrs = [];
+  for (const ex of p.exclusions){
+    for (let dt = new Date(sd); dt <= ed; dt.setDate(dt.getDate() + 1)){
+      if (dt.getDate() === ex.day && (ex.month === null || dt.getMonth() + 1 === ex.month)){
+        exclStrs.push((dt.getMonth()+1)+'/'+dt.getDate());
+      }
+    }
+  }
+  $('exclInput').value = [...new Set(exclStrs)].join(', ');
+  for (const wd of [0,1,2,3,4,5,6]){
+    const r = p.rules[wd];
+    $('wdC'+wd).checked = !!r && r.type !== 'off';
+    $('wdT'+wd).value = !r ? '' : r.type==='times' ? r.times.join(',') : r.type==='slots' ? r.slots.join(',') : '';
+  }
+  if (p.holidayRule){
+    $('holSel').value = 'custom';
+    $('holTime').style.display = '';
+    $('holTime').value = p.holidayRule.type==='times' ? p.holidayRule.times.join(',') :
+                         p.holidayRule.type==='slots' ? p.holidayRule.slots.join(',') : '';
+  } else {
+    $('holSel').value = p.usedHeijitsu ? 'exclude' : 'follow';
+    $('holTime').style.display = 'none';
+  }
+  regen();
+}
+function parseRowValue(v){
+  v = normalize(v);
+  if (!v) return { type: 'date' };
+  const parts = v.split(/[,、]/).map(s=>s.trim()).filter(Boolean);
+  if (parts.every(s=>/^\d{1,2}(:\d{2})?(時(半|\d{1,2}分)?)?$/.test(s))){
+    return { type: 'times', times: parts.map(s=>{
+      const tm = parseTimes(s.includes(':')||s.includes('時')?s:s+'時');
+      return tm.type==='times' ? tm.times[0] : s;
+    })};
+  }
+  return { type: 'slots', slots: parts };
+}
+function regen(){
+  const sv = $('startDate').value, ev = $('endDate').value;
+  if (!sv || !ev) return;
+  const holMode = $('holSel').value;
+  const holRule = holMode==='custom' ? parseRowValue($('holTime').value) : null;
+  const excl = new Set($('exclInput').value.split(/[,、]/).map(s=>s.trim()).filter(Boolean));
+  const out = [];
+  const sd = new Date(sv + 'T00:00:00'), ed = new Date(ev + 'T00:00:00');
+  for (let dt = new Date(sd); dt <= ed; dt.setDate(dt.getDate() + 1)){
+    const y = dt.getFullYear(), mo = dt.getMonth() + 1, d = dt.getDate();
+    const wd = dt.getDay();
+    if (excl.has(mo+'/'+d) || excl.has(String(d))) continue;
+    const key = y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isHol = HOLIDAYS.has(key);
+    let rule = null;
+    if (isHol){
+      if (holMode==='exclude') rule = null;
+      else if (holMode==='custom') rule = holRule;
+      else rule = $('wdC'+wd).checked ? parseRowValue($('wdT'+wd).value) : null;
+    } else {
+      rule = $('wdC'+wd).checked ? parseRowValue($('wdT'+wd).value) : null;
+    }
+    if (!rule) continue;
+    const dateStr = mo+'/'+d+'('+WDCHARS[wd]+(isHol?'祝':'')+')';
+    if (rule.type==='times') for (const t of rule.times) out.push(dateStr+' '+t+'〜');
+    else if (rule.type==='slots') for (const s of rule.slots) out.push(dateStr+' '+s);
+    else out.push(dateStr);
+  }
+  $('preview').value = out.join('\n');
+  $('count').textContent = out.length + '件の候補';
+}
+$('preview') && ($('preview').oninput = ()=>{
+  const n = $('preview').value.split('\n').filter(s=>s.trim()).length;
+  $('count').textContent = n + '件の候補';
+});
+
+/* ===== 作成 ===== */
+async function createEvent(){
+  $('errBox').textContent = '';
+  $('result').style.display = 'none';
+  const name = $('evName').value.trim();
+  const candidates = $('preview').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if (!name){ $('errBox').textContent = 'イベント名を入力してください'; return; }
+  if (!candidates.length){ $('errBox').textContent = '候補日がありません'; return; }
+  const btn = $('createBtn');
+  btn.disabled = true; btn.textContent = '作成中…';
+  try {
+    const r = await fetch('/api/create', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service, name, comment: $('evMemo').value.trim(), candidates })
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok || !j.url) throw new Error(j.error || 'HTTP ' + r.status);
+    const a = $('resultLink'); a.href = j.url; a.textContent = j.url;
+    $('result').style.display = '';
+    $('result').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    // フォールバック
+    if (service === 'densuke'){
+      const f = $('densukeForm');
+      f.eventname.value = name; f.schedule.value = candidates.join('\n');
+      f.explain.value = $('evMemo').value.trim();
+      f.submit();
+      $('errBox').textContent = '自動作成に失敗したため、伝助の確認画面を開きました。内容を確認して「登録」を押してください。\n(' + e.message + ')';
+    } else {
+      try { await navigator.clipboard.writeText(candidates.join('\n')); } catch(_){}
+      window.open('https://chouseisan.com/', '_blank');
+      $('errBox').textContent = '自動作成に失敗しました。候補日をクリップボードにコピーして調整さんを開いたので、「日程候補」欄に貼り付けてください。\n(' + e.message + ')';
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'イベントページを作成';
+  }
+}
+function copyPreview(){
+  navigator.clipboard.writeText($('preview').value).then(()=>{
+    $('copyMsg').textContent = 'コピーしました';
+    setTimeout(()=>$('copyMsg').textContent='', 2000);
+  });
+}
+function copyLink(){
+  navigator.clipboard.writeText($('resultLink').href).then(()=>{
+    $('linkMsg').textContent = 'コピーしました';
+    setTimeout(()=>$('linkMsg').textContent='', 2000);
+  });
+}
+
+initRange();
+initWdTable();
+</script>
+</body>
+</html>
