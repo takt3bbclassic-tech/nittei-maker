@@ -154,8 +154,6 @@ function parseWeekdays(clause){
 }
 function parseTimes(clause){
   if (/なし|除外|除く|休み/.test(clause)) return { type: 'off' };
-  if (/朝昼夜/.test(clause)) return { type: 'slots', slots: ['朝','昼','夜'] };
-  if (/午前午後|午前と午後/.test(clause)) return { type: 'slots', slots: ['午前','午後'] };
   const times = [];
   const re = /(\d{1,2})(?:時半|時(\d{1,2})分|:(\d{2})|時)/g;
   let m;
@@ -166,7 +164,11 @@ function parseTimes(clause){
     else if (m[3] !== undefined) min = +m[3];
     if (h >= 0 && h <= 29) times.push(String(h).padStart(2,'0') + ':' + String(min).padStart(2,'0'));
   }
-  return times.length ? { type: 'times', times } : { type: 'none' };
+  if (times.length) return { type: 'times', times };
+  // 朝・昼・夜・午前・午後の任意の組み合わせ（「昼と夜」「朝と昼」等）
+  const sl = clause.match(/午前|午後|朝|昼|夜/g);
+  if (sl) return { type: 'slots', slots: [...new Set(sl)] };
+  return { type: 'none' };
 }
 function parseNL(input, now){
   now = now || new Date();
@@ -225,6 +227,11 @@ function parseNL(input, now){
   if (!end) end = { y: start.y, m: start.m, d: new Date(start.y, start.m, 0).getDate() };
   if (end.m < start.m) end.y = start.y + 1; // 年跨ぎ（12月→1月など）
   else end.y = start.y;
+  // 「祝日もいれて」のように時間指定がない祝日句は、他の曜日ルールを継承
+  if (holidayRule && holidayRule.type === 'none') {
+    const r0 = Object.values(rules).find(r => r.type !== 'off');
+    if (r0) holidayRule = { ...r0 };
+  }
   return { start, end, rules, holidayRule, usedHeijitsu, exclusions };
 }
 
